@@ -1,20 +1,24 @@
 [package]
 name = "docker"
+description = "Manage your containers with the Pop!_OS Launcher!"
 version = "0.0.1"
+rust-version = "1.74.1"
 edition = "2021"
 repository = "https://github.com/nkia-christoph/pop-launcher-plugin-docker"
 license = "GPL-3.0-only"
 authors = ["Christoph Kröppl <ch.kroeppl@gmx.at>"]
+readme = "README.md"
 publish = false
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-pop-launcher = "1.1.0"
+pop-launcher-toolkit = { git = "https://github.com/oknozor/launcher" }
 docker-api = "0.14"
-tokio = { version = "1.35.0", features = ["rt"] }
+anyhow = "1.0.75"
 serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0.108"
+
+[dev-dependencies]
+clippy = "0.0.302"
 
 [[bin]]
 name = "docker"
