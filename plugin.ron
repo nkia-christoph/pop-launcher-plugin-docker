@@ -1,13 +1,13 @@
 (
-    name: "Docker",
-    description: "Control Containers\npress <d> for docker\npress <c> for compose",
-    query: (
-        regex: "^([dc] )+",
-        help: "d nginx up\nc webapp down",
-        isolate: true,
-        no_sort: true,
-    ),
-    bin: (path: "docker"),
-    icon: Name("text-editor-symbolic"),
-    history: false,
+  name: "Docker",
+  description: "Control Containers\npress <d> for docker\npress <c> for compose",
+  query: (
+    regex: "^([dc] )+",
+    help: "d nginx up\nc webapp down",
+    isolate: true,
+    no_sort: true,
+  ),
+  bin: (path: "docker"),
+  icon: Name("text-editor-symbolic"),
+  history: false,
 )
