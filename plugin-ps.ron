@@ -1,0 +1,13 @@
+(
+  name: "Docker PC",
+  description: "List Containers\nenter <\[d\]ps> for docker\nenter <\[d\]cps> for compose",
+  query: (
+    regex: "^(d?c?ps)$",
+    help: "d nginx up\nc webapp down",
+    isolate: false,
+    no_sort: true,
+  ),
+  bin: (path: "../docker/docker"),
+  icon: Name("text-editor-symbolic"),
+  history: false,
+)
