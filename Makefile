@@ -1,7 +1,8 @@
 PLUGIN_NAME = docker
 USER_PATH = $(HOME)/.local/share/pop-launcher/plugins/${PLUGIN_NAME}
 SYSTEM_PATH = /etc/pop-launcher/plugins/${PLUGIN_NAME}
-PHONY := test_user test_system install_user install_system uninstall_user uninstall_system
+DIST_PATH = //usr/lib/pop-launcher/${PLUGIN_NAME}
+PHONY := test_user test_system test_dist install_user install_system install_dist uninstall_user uninstall_system uninstall_dist
 
 test:
     cargo check
@@ -14,24 +15,33 @@ build_release: test
     cargo clean
     cargo build --release
 
-cp_ron_user:
-	install -Dm0764 $(realpath .)/plugin.ron ${USER_PATH}/plugin.ron
-	install -Dm0764 $(realpath .)/plugin-ps.ron ${USER_PATH}-ps/plugin.ron
-cp_ron_system:
-	install -Dm0774 $(realpath .)/plugin.ron ${SYSTEM_PATH}/plugin.ron
-	install -Dm0774 $(realpath .)/plugin.ron ${SYSTEM_PATH}-ps/plugin.ron
+cp_data_user:
+	install -Dm0764 $(realpath .)/plugins/${PLUGIN_NAME} ${USER_PATH}
+	install -Dm0764 $(realpath .)/plugins/${PLUGIN_NAME}-ps ${USER_PATH}-ps
+cp_data_system:
+	install -Dm0774 $(realpath .)/plugins/${PLUGIN_NAME} ${SYSTEM_PATH}
+	install -Dm0774 $(realpath .)/plugins/${PLUGIN_NAME}-ps ${SYSTEM_PATH}-ps
+cp_data_dist:
+	install -Dm0774 $(realpath .)/plugins/${PLUGIN_NAME} ${DIST_PATH}
+	install -Dm0774 $(realpath .)/plugins/${PLUGIN_NAME}-ps ${DIST_PATH}-ps
 
-test_user: build_test cp_ron_user
+test_user: build_test cp_data_user
     install -Dm0754 $(realpath target/debug)/${PLUGIN_NAME} ${USER_PATH}/${PLUGIN_NAME}
-test_system: build_test cp_ron_system
+test_system: build_test cp_data_system
     install -Dm0774 $(realpath target/debug)/${PLUGIN_NAME} ${SYSTEM_PATH}/${PLUGIN_NAME}
+test_dist: build_test cp_data_dist
+    install -Dm0774 $(realpath target/debug)/${PLUGIN_NAME} ${DIST_PATH}/${PLUGIN_NAME}
 
-install_user: build_release cp_ron_user
+install_user: build_release cp_data_user
     install -Dm0754 $(realpath target/release)/${PLUGIN_NAME} ${USER_PATH}/${PLUGIN_NAME}
-install_system: build_release cp_ron_system
+install_system: build_release cp_data_system
     install -Dm0774 $(realpath target/release)/${PLUGIN_NAME} ${SYSTEM_PATH}/${PLUGIN_NAME}
+install_dist: build_release cp_data_dist
+    install -Dm0774 $(realpath target/release)/${PLUGIN_NAME} ${DIST_PATH}/${PLUGIN_NAME}
 
 uninstall_user:
     rm -r ${USER_PATH}
 uninstall_system:
     rm -r ${SYSTEM_PATH}
+uninstall_dist:
+    rm -r ${DIST_PATH}

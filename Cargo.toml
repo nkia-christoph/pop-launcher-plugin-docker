@@ -11,12 +11,15 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-pop-launcher-toolkit = { git = "https://github.com/oknozor/launcher" }
 docker-api = "0.14"
+pop-launcher-toolkit = { git = "https://github.com/oknozor/launcher" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 tokio = { version = "1", features = ["rt"] }
 
 [dev-dependencies]
 clippy = "0.0.302"
+anyhow = "1"
 
 [[bin]]
 name = "docker"
