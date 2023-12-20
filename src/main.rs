@@ -27,13 +27,17 @@ use std::{
 use crate::container::Container;
 
 
+type ContainerMap = Arc<Mutex<HashMap<String, Container>>>;
+type ResultMap = Arc<Mutex<HashMap<Indice, PluginSearchResult>>>;
+
 pub struct Plugin {
     pub icon: Option<IconSource>,
     pub docker: Docker,
-    pub containers: Arc<Mutex<HashMap<String, Container>>>,
+    pub containers: ContainerMap,
     pub timestamp: SystemTime,
-    pub results: Arc<Mutex<Vec<PluginSearchResult>>>,
+    pub results: ResultMap,
 }
+
 
 impl Default for Plugin {
     fn default() -> Self {
@@ -42,7 +46,7 @@ impl Default for Plugin {
             docker: docker::new_docker().unwrap(),
             containers: Arc::new(Mutex::new(HashMap::new())),
             timestamp: SystemTime::now(),
-            results: Arc::new(Mutex::new(Vec::new())),
+            results: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -124,9 +128,9 @@ impl PluginExt for Plugin {
     }
 }
 
-async fn add(db: Arc<Mutex<Vec<PluginSearchResult>>>, id: usize, result: Arc<PluginSearchResult>) {
+async fn add(db: ResultMap, id: usize, result: Arc<PluginSearchResult>) {
     let mut results = db.lock().unwrap();
-    results.insert(id, PluginSearchResult::clone(&result));
+    results.insert(id as Indice, PluginSearchResult::clone(&result));
 }
 
 #[tokio::main(flavor = "current_thread")]
