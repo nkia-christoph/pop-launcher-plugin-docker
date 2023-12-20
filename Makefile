@@ -1,7 +1,7 @@
 PLUGIN_NAME = docker
 USER_PATH = $(HOME)/.local/share/pop-launcher/plugins/${PLUGIN_NAME}
 SYSTEM_PATH = /etc/pop-launcher/plugins/${PLUGIN_NAME}
-DIST_PATH = //usr/lib/pop-launcher/${PLUGIN_NAME}
+DIST_PATH = /usr/lib/pop-launcher/plugins/${PLUGIN_NAME}
 PHONY := test_user test_system test_dist install_user install_system install_dist uninstall_user uninstall_system uninstall_dist
 
 test:
