@@ -1,5 +1,8 @@
 mod docker;
-mod container;
+use crate::docker::{
+    docker_ps,
+    Container,
+};
 use docker_api::Docker;
 use pop_launcher_toolkit::launcher::{
     Indice,
@@ -24,7 +27,6 @@ use std::{
     sync::Mutex,
     time::SystemTime,
 };
-use crate::container::Container;
 
 
 type ContainerMap = Arc<Mutex<HashMap<String, Container>>>;
@@ -32,7 +34,7 @@ type ResultMap = Arc<Mutex<HashMap<Indice, PluginSearchResult>>>;
 
 pub struct Plugin {
     pub icon: Option<IconSource>,
-    pub docker: Docker,
+    pub docker: Arc<Mutex<Docker>>,
     pub containers: ContainerMap,
     pub timestamp: SystemTime,
     pub results: ResultMap,
@@ -43,7 +45,7 @@ impl Default for Plugin {
     fn default() -> Self {
         Self {
             icon: Some(IconSource::Mime(Cow::Borrowed("docker-icon.png"))),
-            docker: docker::new_docker().unwrap(),
+            docker: Arc::new(Mutex::new(docker::new_docker().unwrap())),
             containers: Arc::new(Mutex::new(HashMap::new())),
             timestamp: SystemTime::now(),
             results: Arc::new(Mutex::new(HashMap::new())),
@@ -53,13 +55,18 @@ impl Default for Plugin {
 
 impl Plugin {
     #[allow(unused_variables)]
-    fn get_description(&self, container: &Container) -> &'static str {
-        "test description"
+    fn get_description(&self, container: &Container) -> String {
+        format!("{} ,<b>image</b>: {},<b>id: </b>{}",
+            container.state,
+            container.image,
+            container.id
+        )
     }
 
     async fn handle_single_cmd(&mut self, _: &str) {
         // ps, dps, dcps, cps
         tracing::info!(" - process 1-word-command");
+        println!(" - process 1-word-command");
         let mut task_set = JoinSet::new();
 
         for (id, (name, container)) in
@@ -96,13 +103,13 @@ impl Plugin {
 
 #[async_trait]
 impl PluginExt for Plugin {
-
     fn name(&self) -> &str {
         "docker"
     }
 
     async fn search(&mut self, query: &str) {
         tracing::info!("Received query: ${query}");
+        println!("Received query: ${query}");
 
         match query.split_once(' ') {
             None => self.handle_single_cmd(query.as_ref()).await,
@@ -139,11 +146,19 @@ async fn add(db: ResultMap, id: usize, result: Arc<PluginSearchResult>) {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Error> {
+    tracing::info!("Plugin active");
+    println!("Plugin active");
 
     let mut plugin: Plugin = Plugin::default();
     tracing::info!("Started docker plugin");
+    println!("Started docker plugin");
 
-    plugin.run().await;
+    let docker = Arc::clone(&plugin.docker);
+    let containers = Arc::clone(&plugin.containers);
+    let _ = tokio::join!(
+        plugin.run(),
+        docker_ps(docker, containers),
+    );
 
     Ok(())
 }
