@@ -73,6 +73,7 @@ impl Plugin {
                 ..Default::default()
             });
 
+            tracing::info!(" - scheduling returning result");
             let result_1 = result.clone();
             task_set.spawn( async move {
                 send(&mut tokio::io::stdout(),
@@ -82,6 +83,7 @@ impl Plugin {
                 ))).await;
             });
 
+            tracing::info!(" - scheduling adding result to hashmap");
             let results = self.results.clone();
             let result_2 = result.clone();
             task_set.spawn( async move {
@@ -129,6 +131,8 @@ impl PluginExt for Plugin {
 }
 
 async fn add(db: ResultMap, id: usize, result: Arc<PluginSearchResult>) {
+    tracing::info!(" - adding result");
+
     let mut results = db.lock().unwrap();
     results.insert(id as Indice, PluginSearchResult::clone(&result));
 }
