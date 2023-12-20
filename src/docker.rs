@@ -22,13 +22,10 @@ pub struct Container {
 #[cfg(unix)]
 pub fn new_docker() -> Result<Docker> {
     tracing::info!("Connecting to Docker Socket");
-    println!("Connecting to Docker Socket");
     Ok(Docker::unix("/var/run/docker.sock"))
 }
 
 pub async fn docker_ps(docker: Arc<Mutex<Docker>>, container_db: Arc<Mutex<HashMap<String, Container>>>) -> Result<()> {
-    print!("docker ps");
-
     let opts = ContainerListOpts::builder().all(true).build();
     match docker.lock().unwrap().containers().list(&opts).await {
         Ok(containers) => {
@@ -43,7 +40,7 @@ pub async fn docker_ps(docker: Arc<Mutex<Docker>>, container_db: Arc<Mutex<HashM
                 });
             });
         }
-        Err(e) => println!("Error: {e}"),
+        Err(e) => tracing::error!("Failed to get container list (docker ps).\n${e}"),
     }
 
     Ok(())

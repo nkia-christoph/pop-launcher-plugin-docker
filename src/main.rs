@@ -66,7 +66,6 @@ impl Plugin {
     async fn handle_single_cmd(&mut self, _: &str) {
         // ps, dps, dcps, cps
         tracing::info!(" - process 1-word-command");
-        println!(" - process 1-word-command");
         let mut task_set = JoinSet::new();
 
         for (id, (name, container)) in
@@ -109,7 +108,6 @@ impl PluginExt for Plugin {
 
     async fn search(&mut self, query: &str) {
         tracing::info!("Received query: ${query}");
-        println!("Received query: ${query}");
 
         match query.split_once(' ') {
             None => self.handle_single_cmd(query.as_ref()).await,
@@ -147,11 +145,9 @@ async fn add(db: ResultMap, id: usize, result: Arc<PluginSearchResult>) {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Error> {
     tracing::info!("Plugin active");
-    println!("Plugin active");
 
     let mut plugin: Plugin = Plugin::default();
     tracing::info!("Started docker plugin");
-    println!("Started docker plugin");
 
     let docker = Arc::clone(&plugin.docker);
     let containers = Arc::clone(&plugin.containers);
