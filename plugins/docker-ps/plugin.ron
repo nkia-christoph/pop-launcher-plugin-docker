@@ -1,13 +1,13 @@
 (
-  name: "Docker PC",
-  description: "List Containers\nenter <\[d\]ps> for docker\nenter <\[d\]cps> for compose",
+  name: "Docker PS",
+  description: "Syntax: <[d]ps> for docker ps\n        <[d]cps> for compose ps",
   query: (
     regex: "^(d?c?ps)$",
-    help: "d nginx up\nc webapp down",
+    help: "dps",
     isolate: false,
     no_sort: true,
   ),
   bin: (path: "../docker/docker"),
-  icon: Name("text-editor-symbolic"),
+  icon: Mime("../docker/docker-icon.png"),
   history: false,
 )

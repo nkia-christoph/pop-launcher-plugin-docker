@@ -47,3 +47,16 @@ _Pop Launcher Plugin written in Rust_
 - [ ] search
 - [ ] version
 - [ ] stats
+
+---
+
+## Debugging
+see standard launcher log location:
+```
+~/.local/state/pop-launcher
+~/.local/state/docker
+```
+
+---
+
+This plugin was created due to the mild frustration experienced with the official vscode docker extension.
