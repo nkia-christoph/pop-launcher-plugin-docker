@@ -53,8 +53,8 @@ _Pop Launcher Plugin written in Rust_
 ## Debugging
 see standard launcher log location:
 ```
-~/.local/state/pop-launcher
-~/.local/state/docker
+~/.local/state/pop-launcher/pop-launcher.log
+~/.local/state/pop-launcher/docker.log
 ```
 
 ---

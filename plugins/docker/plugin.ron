@@ -1,6 +1,6 @@
 (
-  name: "Docker",
-  description: "Syntax: <d> for docker\n        <c> for compose",
+  name: "Docker (list and control)",
+  description: "Syntax: { d(ocker) | c(ompose) } <command>\nExample: d nginx up",
   query: (
     regex: "^([dc] )+",
     help: "d nginx up",
@@ -8,6 +8,6 @@
     no_sort: true,
   ),
   bin: (path: "docker"),
-  icon: Mime("docker-icon.png"),
+  icon: Name("system-run-symbolic"),
   history: false,
 )
