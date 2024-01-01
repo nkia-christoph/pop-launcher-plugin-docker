@@ -2,10 +2,10 @@
   name: "Docker (list and control)",
   description: "Syntax: { d(ocker) | c(ompose) } <command>\nExample: d nginx up",
   query: (
-    regex: "^([dc] )+",
+    regex: "^([dc] ).+",
     help: "d nginx up",
     isolate: true,
-    no_sort: true,
+    no_sort: false,
   ),
   bin: (path: "docker"),
   icon: Name("system-run-symbolic"),

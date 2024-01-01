@@ -1,104 +1,22 @@
 mod docker;
-use crate::docker::{
-    docker_ps,
-    Container,
-};
-use docker_api::Docker;
-use pop_launcher_toolkit::launcher::{
-    Indice,
-    IconSource,
-    PluginResponse,
-    PluginSearchResult,
-};
-use pop_launcher_toolkit::plugins::send;
-use pop_launcher_toolkit::plugin_trait::{
-    async_trait,
-    tracing,
-    PluginExt,
-};
-use tokio::{
-    task::JoinSet,
-    time::error::Error,
-};
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    sync::Arc,
-    sync::Mutex,
-    time::SystemTime,
+mod plugin;
+
+use crate::{
+    docker::docker_ps,
+    docker::Container,
+    plugin::Plugin,
 };
 
+use pop_launcher_toolkit::{
+    launcher::Indice,
+    launcher::PluginResponse,
+    launcher::PluginSearchResult,
+    plugin_trait::async_trait,
+    plugin_trait::tracing::*,
+    plugin_trait::PluginExt,
+};
+use tokio::time::error::Error;
 
-type ContainerMap = Arc<Mutex<HashMap<String, Container>>>;
-type ResultMap = Arc<Mutex<HashMap<Indice, PluginSearchResult>>>;
-
-pub struct Plugin {
-    pub icon: Option<IconSource>,
-    pub docker: Arc<Mutex<Docker>>,
-    pub containers: ContainerMap,
-    pub timestamp: SystemTime,
-    pub results: ResultMap,
-}
-
-
-impl Default for Plugin {
-    fn default() -> Self {
-        Self {
-            icon: Some(IconSource::Name(Cow::Borrowed("./docker-icon.png"))),
-            docker: Arc::new(Mutex::new(new_docker!("/var/run/docker.sock"))),
-            containers: Arc::new(Mutex::new(HashMap::new())),
-            timestamp: SystemTime::now(),
-            results: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-}
-
-impl Plugin {
-    #[allow(unused_variables)]
-    fn get_description(&self, container: &Container) -> String {
-        format!("{}, image: {}, id: {}",
-            container.state,
-            container.image,
-            container.id
-        )
-    }
-
-    async fn handle_single_cmd(&mut self, _: &str) {
-        // ps, dps, dcps, cps
-        tracing::info!(" - process 1-word-command");
-        let mut task_set = JoinSet::new();
-
-        for (id, (name, container)) in
-            self.containers.lock().unwrap().iter().enumerate()
-        {
-            let result = Arc::new(PluginSearchResult {
-                id: id as Indice,
-                name: name.to_owned(),
-                description: self.get_description(container).to_owned(),
-                icon: self.icon.to_owned(),
-                ..Default::default()
-            });
-
-            tracing::info!(" - scheduling returning result");
-            let result_1 = result.clone();
-            task_set.spawn( async move {
-                send(&mut tokio::io::stdout(),
-                    PluginResponse::Append(
-                        PluginSearchResult::clone(
-                            result_1.as_ref()
-                ))).await;
-            });
-
-            tracing::info!(" - scheduling adding result to hashmap");
-            let results = self.results.clone();
-            let result_2 = result.clone();
-            task_set.spawn( async move {
-                add(results, id, result_2).await;
-            });
-        }
-        while (task_set.join_next().await).is_some() {};
-    }
-}
 
 #[async_trait]
 impl PluginExt for Plugin {
@@ -107,19 +25,25 @@ impl PluginExt for Plugin {
     }
 
     async fn search(&mut self, query: &str) {
-        tracing::info!("Received query: ${query}");
+        info!("received query: ${query}");
 
         match query.split_once(' ') {
-            None => self.handle_single_cmd(query.as_ref()).await,
-            Some(split_query) => {
-                let result = PluginSearchResult {
-                    id: 0 as Indice,
-                    name: "Docker is down.".to_owned(),
-                    description: "No active containers. Would you like to start a recent one?".to_owned(),
-                    icon: self.icon.to_owned(),
-                    ..Default::default()
-                };
-                self.respond_with(PluginResponse::Append(result)).await
+
+            None => self.handle_single_cmd(query).await,
+            Some((_, second)) => {
+                match second.is_empty() {
+                    true => self.handle_single_cmd(query).await,
+                    false => {
+                        let result = PluginSearchResult {
+                            id: 0 as Indice,
+                            name: "No active containers".to_owned(),
+                            description: "Would you like to start a recent one?".to_owned(),
+                            //SearchResult: category_icon: self.icon.to_owned(),
+                            ..Default::default()
+                        };
+                        self.respond_with(PluginResponse::Append(result)).await
+                    }
+                }
                 // list last active containers maybe and start them with enter?
             }
         }
@@ -128,33 +52,33 @@ impl PluginExt for Plugin {
     }
 
     async fn activate(&mut self, id: Indice) {
-        tracing::info!("Plugin activated");
+        info!("Plugin activated");
 
         todo!()
         //add context: restart, stop, exec, append, etc.
     }
 }
 
-async fn add(db: ResultMap, id: usize, result: Arc<PluginSearchResult>) {
-    tracing::info!(" - adding result");
-
-    let mut results = db.lock().unwrap();
-    results.insert(id as Indice, PluginSearchResult::clone(&result));
-}
-
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Error> {
-    tracing::info!("Plugin active");
+    info!("docker plugin activated");
 
     let mut plugin: Plugin = Plugin::default();
-    tracing::info!("Started docker plugin");
-
-    let docker = Arc::clone(&plugin.docker);
-    let containers = Arc::clone(&plugin.containers);
-    let _ = tokio::join!(
-        plugin.run(),
-        docker_ps(docker, containers),
-    );
+    // ToDo: impl. communication inbetween
+    // let _ = tokio::join!(
+    //     docker_ps(
+    //         plugin.docker.clone(),
+    //         plugin.containers.clone(),
+    //         None,
+    //     ),
+    //     plugin.run(),
+    // );
+    let _ = docker_ps(
+        plugin.docker.clone(),
+        plugin.containers.clone(),
+        None,
+    ).await;
+    let _ = plugin.run().await;
 
     Ok(())
 }

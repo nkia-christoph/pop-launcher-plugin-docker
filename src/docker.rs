@@ -4,7 +4,7 @@ use docker_api::{
     Result,
 };
 use pop_launcher_toolkit::{
-    plugin_trait::tracing,
+    plugin_trait::tracing::*,
     launcher::IconSource,
 };
 use std::{
@@ -28,7 +28,7 @@ macro_rules! mime_icon{
 #[macro_export]
 macro_rules! new_docker{
     ($a:expr) => {
-        Docker::unix($a)
+        docker_api::Docker::unix($a)
     }
 }
 
@@ -71,7 +71,6 @@ impl State {
 
     /// prepend unicode icon to name
     /// until we can provide categ. icon through PluginSearchResult
-    #[allow(dead_code)]
     fn get_unicode(&self) -> &str {
         use State::*;
         match self {
@@ -80,15 +79,31 @@ impl State {
             Running => "\u{1F197}", // 🆗 U+1F197
             Removing => "\u{267B}", // ♻ U+267B
             Paused => "\u{23F8}", // ⏸ U+23F8
-            Exited => "\u{1F5D1}", // 🗑 U+1F5D1
+            Exited => "\u{1F5D1}__", // 🗑 U+1F5D1
             Dead => "\u{2620}", // ☠ U+2620
         }
     }
 }
 
-pub async fn docker_ps(docker: Arc<Mutex<Docker>>, container_db: Arc<Mutex<HashMap<String, Container>>>) -> Result<()> {
-    let opts = ContainerListOpts::builder().all(true).build();
-    match docker.lock().unwrap().containers().list(&opts).await {
+pub async fn docker_ps<'a>(
+    docker: Arc<Mutex<Docker>>,
+    container_db: Arc<Mutex<HashMap<String, Container>>>,
+    opts: Option<&ContainerListOpts>,
+) -> Result<()> {
+    // handle default
+    let default: ContainerListOpts;
+    let opts = match opts {
+        Some(provided) => provided,
+        None => {
+            default = ContainerListOpts::builder().all(true).build();
+            &default
+        },
+    };
+
+    match docker.lock()
+                .expect("could not lock onto Plugin.docker")
+                .containers().list(opts).await
+    {
         Ok(containers) => {
             let mut db = container_db.lock().unwrap();
             containers.into_iter().for_each(|container| {
@@ -102,15 +117,14 @@ pub async fn docker_ps(docker: Arc<Mutex<Docker>>, container_db: Arc<Mutex<HashM
                         state.get_unicode(),
                         name,
                     ),
-                    //id: container.id.unwrap_or_default()[..12].to_owned(),
-                    id: container.id.unwrap_or_default().to_owned(),
+                    id: container.id.unwrap_or_default()[..12].to_owned(),
                     image: container.image.unwrap_or_default(),
                     icon: state.get_icon(),
                     state,
                 });
             });
         }
-        Err(e) => tracing::error!("Failed to get container list (docker ps).\n${e}"),
+        Err(e) => error!("failed to get container list (docker ps).\n${e}"),
     }
 
     Ok(())
@@ -123,7 +137,7 @@ fn get_name<'a>(names: &'a Option<Vec<String>>) -> &'a str {
             n[0].as_str()
         )
         .unwrap_or_else(|| {
-            tracing::error!("could not get container name");
+            error!("could not get container name");
             let placeholder: &'a str = "/Error";
             placeholder
         });

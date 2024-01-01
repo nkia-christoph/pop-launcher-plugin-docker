@@ -1,11 +1,11 @@
 (
-  name: "Docker (list)",
-  description: "Syntax: { ps | dps | cps | dcps }\nExample: ps",
+  name: "Docker list (ps)",
+  description: "Syntax: { dps | cps | dcps }\nExample: dps",
   query: (
-    regex: "^(d?c?ps)$",
+    regex: "^(dl|dps|cps|dcps)$",
     help: "dps",
     isolate: true,
-    no_sort: true,
+    no_sort: false,
   ),
   bin: (path: "../docker/docker"),
   icon: Name("system-run-symbolic"),
