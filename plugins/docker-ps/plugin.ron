@@ -6,7 +6,6 @@
     help: "dps",
     isolate: true,
     no_sort: true,
-    //priority: High,
   ),
   bin: (path: "../docker/docker"),
   icon: Name("system-run-symbolic"),

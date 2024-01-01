@@ -44,8 +44,8 @@ pub struct Plugin {
 impl Default for Plugin {
     fn default() -> Self {
         Self {
-            icon: Some(IconSource::Mime(Cow::Borrowed("docker-icon.png"))),
-            docker: Arc::new(Mutex::new(docker::new_docker().unwrap())),
+            icon: Some(IconSource::Name(Cow::Borrowed("./docker-icon.png"))),
+            docker: Arc::new(Mutex::new(new_docker!("/var/run/docker.sock"))),
             containers: Arc::new(Mutex::new(HashMap::new())),
             timestamp: SystemTime::now(),
             results: Arc::new(Mutex::new(HashMap::new())),
@@ -56,7 +56,7 @@ impl Default for Plugin {
 impl Plugin {
     #[allow(unused_variables)]
     fn get_description(&self, container: &Container) -> String {
-        format!("{} ,<b>image</b>: {},<b>id: </b>{}",
+        format!("{}, image: {}, id: {}",
             container.state,
             container.image,
             container.id
