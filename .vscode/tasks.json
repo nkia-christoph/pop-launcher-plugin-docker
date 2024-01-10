@@ -1,0 +1,66 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "install rustup",
+      "linux": {
+        "command": "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+      },
+      "type": "shell",
+      "group": "build"
+    },
+    {
+      "label": "test user",
+      "command": "make",
+      "args": ["test_user"],
+      "type": "shell",
+      "group": "test"
+    },
+    {
+      "label": "test system",
+      "command": "make",
+      "args": ["test_system"],
+      "type": "shell",
+      "group": "test"
+    },
+    {
+      "label": "install user",
+      "command": "make",
+      "args": ["install_user"],
+      "type": "shell",
+      "group": "build"
+    },
+    {
+      "label": "install system",
+      "command": "make",
+      "args": ["install_system"],
+      "type": "shell",
+      "group": "build"
+    },
+    {
+      "label": "check",
+      "command": "cargo check",
+      "type": "shell"
+    },
+    {
+      "label": "test",
+      "command": "cargo test",
+      "type": "shell"
+    },
+    {
+      "label": "test",
+      "dependsOn": ["check", "test"],
+      "dependsOrder": "parallel",
+      "group": "test"
+    },
+    {
+      "label": "analyze",
+      "dependsOn": ["tools"],
+      "command": "cargo tree --duplicates -e=no-dev && cargo bloat --release --crates && cargo depgraph | dot -Tpng > target/depgraph.png"
+    },
+    {
+      "label": "tools",
+      "command": "cargo install cargo-depgraph cargo-bloat"
+    }
+  ]
+}

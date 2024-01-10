@@ -1,0 +1,18 @@
+(
+  name: "Docker",
+  description: "Syntax: { d(ocker) | c(ompose) } <command>
+Examples: d nginx up,
+                d ps, d la,
+                c ps, c la,
+                dl, dps, dla,
+                cl, cps, cla",
+  query: (
+    regex: "^([dc] .+?|docker .+?|compose .+?|[dc]la?|[dc]ps)$",
+    help: "dla",
+    isolate: true,
+    no_sort: true,
+  ),
+  bin: (path: "docker"),
+  icon: Name("system-run-symbolic"),
+  history: false,
+)

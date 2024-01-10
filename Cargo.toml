@@ -1,0 +1,32 @@
+[package]
+name = "docker"
+description = "Manage your containers with the Pop!_OS Launcher!"
+version = "0.0.1"
+rust-version = "1.74.1"
+edition = "2021"
+repository = "https://github.com/nkia-christoph/pop-launcher-plugin-docker"
+license = "GPL-3.0-only"
+authors = ["Christoph Kröppl <ch.kroeppl@gmx.at>"]
+readme = "README.md"
+publish = false
+
+[dependencies]
+docker-api = "0"
+#pop-launcher-toolkit = { git = "https://github.com/pop-os/launcher/" } # fails due to smithay-client-toolkit
+pop-launcher-toolkit = { git = "https://github.com/oknozor/launcher/" }
+serde = { version = "1", features = ["derive"] }
+strum = { version = "0", features = ["derive"] }
+tokio = { version = "1", features = ["rt"] }
+
+[dev-dependencies]
+clippy = "*"
+
+[[bin]]
+name = "docker"
+path = "src/main.rs"
+
+[profile.release]
+codegen-units = 1
+lto = true
+panic = "abort"
+strip = true
