@@ -31,16 +31,17 @@ use std::{
 };
 use tokio::task::JoinSet;
 
+
 #[macro_export]
-macro_rules! icon_name_borrowed{
-    ($a:expr) => {
+macro_rules! icon_borrowed{
+    ( $a:expr ) => {
         Some(pop_launcher_toolkit::launcher::IconSource::Name(std::borrow::Cow::Borrowed($a)))
     }
 }
 
 #[macro_export]
-macro_rules! icon_name_owned{
-    ($a:expr) => {
+macro_rules! icon_owned{
+    ( $a:expr ) => {
         Some(pop_launcher_toolkit::launcher::IconSource::Name(std::borrow::Cow::Owned($a)))
     }
 }
@@ -48,8 +49,7 @@ macro_rules! icon_name_owned{
 #[macro_export]
 /// log & panic if mutex is poisoned
 macro_rules! lock{
-    ($mutex:expr) => {
-        //#[allow(unreachable_code)]
+    ( $mutex:expr ) => {
         match $mutex.lock() {
             Ok(guard) => guard,
             Err(why) => {
@@ -64,9 +64,33 @@ macro_rules! lock{
     }
 }
 
+#[macro_export]
+/// log error and return
+macro_rules! error_return{
+    ( $msg:expr $(, $x:expr)* $(,)? ) => {
+        {
+            error!($msg, $( $x, )*);
+            return
+        }
+    };
+}
+
+#[macro_export]
+/// log info and return
+macro_rules! info_return{
+    ( $msg:expr $(, $x:expr)* $(,)? ) => {
+        {
+            info!($msg, $( $x, )*);
+            return
+        }
+    };
+}
+
+
 pub type ContainerMap = Arc<Mutex<HashMap<String, Container>>>;
-pub type ResultMap = Arc<Mutex<HashMap<Indice, WrappedResult>>>;
-pub type ContextOptionMap = Arc<Mutex<HashMap<Indice, WrappedContext>>>;
+pub type ResultMap = Arc<Mutex<HashMap<Indice, Arc<WrappedResult>>>>;
+pub type ContextMap = Arc<Mutex<HashMap<Indice, Arc<WrappedContext>>>>;
+
 
 pub struct Plugin {
     //pub out: Arc<tokio::io::Stdout>,
@@ -78,12 +102,12 @@ pub struct Plugin {
     pub tasks: JoinSet<()>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct WrappedResult {
     pub action: Option<Action>,
     pub complete: Option<String>,
     pub container_id: Option<String>,
-    pub context_options: Option<ContextOptionMap>,
+    pub context_options: Option<ContextMap>,
     pub result: PluginSearchResult,
     //pub exec: dyn Fn(),
 }
@@ -94,8 +118,9 @@ pub struct WrappedContext {
     pub exec: Option<docker::Action>,
 }
 
+
 /// Default Action for a PluginSearchResult (on enter)
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Action {
     /// Complete/Replace the search with the provided string
     Complete,
@@ -127,12 +152,11 @@ impl Default for Plugin {
 }
 
 impl Plugin {
-    #[allow(unused_variables)]
     fn description(&self, container: &Container) -> String {
         format!("{}, image: {}, id: {}",
             container.state,
             container.image,
-            container.id
+            container.id,
         )
     }
 
@@ -142,32 +166,48 @@ impl Plugin {
         info!(" - process 1-word-command");
 
         match command {
-            // all containers
-            "dla" | "cla" => {
-                let filter: ContainerFilter = filter_all!();
-                if self.view_containers(&filter).await.is_none() {
-                    self.no_active_notice().await
-                }
-            },
-            _ => {
-                let filter: ContainerFilter = filter_default!();
-                if let Some(_result) = self.view_containers(&filter).await {
-                    if lock!(self.containers).len() == 0 {
-                        self.no_active_notice().await
-                    } else {
-                        self.no_visible_notice().await;
-                    }
-                }
-            },
+            "dl" | "cl" | "dps" | "cps" => self.list().await,
+            "dla" | "cla" => self.list_all().await,
+            _ => unreachable!(), // TODO: handle & display error
         };
+    }
+
+    async fn list(&mut self) {
+        let filter: ContainerFilter = filter_default!();
+        match self.view_containers(&filter).await {
+            None => self.no_active_notice().await,
+            Some(viewed) => {
+                let containers = lock!(self.containers).len() as Indice;
+                match containers {
+                    0 => self.no_active_notice().await,
+                    _ if viewed < containers => self.no_visible_notice().await,
+                    _ => (),
+                }
+            },
+        }
+    }
+
+    async fn list_all(&mut self) {
+        let filter: ContainerFilter = filter_all!();
+        if self.view_containers(&filter).await.is_none() {
+            self.no_active_notice().await
+        }
     }
 
     pub async fn handle_query(&mut self, _query: &str) {
         info!(" - process space separated query");
 
         let filter: ContainerFilter = filter_non_default!();
-        if let Some(_result) = self.view_containers(&filter).await {
-            self.no_active_notice().await
+        match self.view_containers(&filter).await {
+            None => self.no_active_notice().await,
+            Some(viewed) => {
+                let containers = lock!(self.containers).len() as Indice;
+                match containers {
+                    0 => self.no_active_notice().await,
+                    _ if viewed < containers => self.no_visible_notice().await,
+                    _ => (),
+                }
+            },
         }
     }
 
@@ -178,7 +218,7 @@ impl Plugin {
             id: 0 as Indice,
             name: "No active containers".to_owned(),
             description: "Would you like to start a recent one?".to_owned(),
-            icon: icon_name_borrowed!("dialog-error"),
+            icon: icon_borrowed!("dialog-error"),
             //category_icon: self.icon.to_owned(),
             ..Default::default()
         };
@@ -206,7 +246,7 @@ impl Plugin {
             id: 0 as Indice,
             name: "No visible containers".to_owned(),
             description: "Would you like to see all containers?".to_owned(),
-            icon: icon_name_borrowed!("dialog-error"),
+            icon: icon_borrowed!("dialog-error"),
             //category_icon: self.icon.to_owned(),
             ..Default::default()
         };
@@ -232,13 +272,13 @@ impl Plugin {
         info!("   - filtering containers");
 
         let mut id: Indice = 0;
-        for (container_id, container) in
-            lock!(self.containers).iter()
-        {
-            if !filter.contains(&container.state) {
-                continue;
-            };
 
+        for (container_id, container) in lock!(self.containers)
+            .iter()
+            .filter(|container|{
+                filter.contains(&container.1.state)
+            })
+        {
             // reserve index 0 for notices
             id += 1;
 
@@ -246,7 +286,7 @@ impl Plugin {
                 id,
                 name: container.name.to_owned(),
                 description: self.description(container).to_owned(),
-                icon: icon_name_owned!(format!("{}", &self.icon)),
+                icon: icon_owned!(format!("{}", &self.icon)),
                 ..Default::default()
             };
 
@@ -270,14 +310,14 @@ impl Plugin {
                     .state
                     .actions()
                     .map(|actions| {
-                        let mut context_options: HashMap<Indice, WrappedContext> = HashMap::new();
+                        let mut context_options: HashMap<Indice, Arc<WrappedContext>> = HashMap::new();
                         for (i, action) in
                             actions.iter().enumerate()
                         {
-                            context_options.insert(i as Indice, WrappedContext {
+                            context_options.insert(i as Indice, Arc::new( WrappedContext {
                                 name: action.to_string(),
                                 exec: Some(action.clone()),
-                            });
+                            }));
                         }
                         Arc::new(Mutex::new(context_options))
                 });
@@ -301,7 +341,7 @@ impl Plugin {
         }
     }
 
-    pub async fn view_context_options(&mut self, id: &Indice, options: ContextOptionMap) {
+    pub async fn view_context_options(&mut self, id: &Indice, options: ContextMap) {
         info!(" - scheduling returning context options");
 
         let context_options: Vec<ContextOption>;
@@ -327,5 +367,5 @@ async fn add(db: ResultMap, id: Indice, wrapped: WrappedResult) {
     info!(" - adding result");
 
     let mut guard_results = lock!(db);
-    guard_results.insert(id, wrapped);
+    guard_results.insert(id, Arc::new(wrapped));
 }

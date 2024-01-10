@@ -1,6 +1,8 @@
 use crate::{
-    icon_name_borrowed,
-    Plugin, lock,
+    icon_borrowed,
+    lock,
+    Plugin,
+    plugin::ContainerMap,
 };
 
 use docker_api::{
@@ -13,7 +15,6 @@ use pop_launcher_toolkit::{
     launcher::IconSource,
 };
 use std::{
-    collections::HashMap,
     str::FromStr,
     sync::Arc,
     sync::Mutex,
@@ -22,6 +23,8 @@ use strum::{
     Display,
     EnumString,
 };
+use tokio::time::error::Error;
+
 
 #[macro_export]
 macro_rules! new_docker{
@@ -106,6 +109,7 @@ pub enum Action {
     Exec,
     Logs,
 }
+
 
 impl Action {
     pub async fn execute(&self,
@@ -260,13 +264,13 @@ impl State {
         use State::*;
         let default: &str = "./docker-icon.png";
         match self {
-            Created => icon_name_borrowed!(&default),
-            Restarting => icon_name_borrowed!(&default),
-            Running => icon_name_borrowed!(&default),
-            Removing => icon_name_borrowed!(&default),
-            Paused => icon_name_borrowed!(&default),
-            Exited => icon_name_borrowed!(&default),
-            Dead => icon_name_borrowed!(&default),
+            Created => icon_borrowed!(&default),
+            Restarting => icon_borrowed!(&default),
+            Running => icon_borrowed!(&default),
+            Removing => icon_borrowed!(&default),
+            Paused => icon_borrowed!(&default),
+            Exited => icon_borrowed!(&default),
+            Dead => icon_borrowed!(&default),
         }
     }
 
@@ -288,36 +292,24 @@ impl State {
 
 pub async fn docker_ps<'a>(
     docker: Arc<Mutex<Docker>>,
-    container_db: Arc<Mutex<HashMap<String, Container>>>,
-    opts: Option<&ContainerListOpts>,
-) {
-    // handle default
-    let default: ContainerListOpts;
-    let opts = match opts {
-        Some(provided) => provided,
-        None => {
-            default = ContainerListOpts::builder().all(true).build();
-            &default
-        },
-    };
-
+    container_db: ContainerMap
+) -> Result<(), Error> {
+    let opts = ContainerListOpts::builder().all(true).build();
     let containers: Vec<ContainerSummary>;
+
     #[allow(clippy::await_holding_lock)]
     {
         let guard_docker = lock!(docker);
         containers = guard_docker
             .containers()
-            .list(opts)
+            .list(&opts)
             .await
             .expect("failed to get container list (docker ps)");
     }
     {
         let mut guard_db = lock!(container_db);
 
-        containers
-            .into_iter()
-            .for_each(|container|
-        {
+        containers.into_iter().for_each(|container| {
             let name = name(&container.names);
             let state = State::from_str(container
                 .state
@@ -338,6 +330,8 @@ pub async fn docker_ps<'a>(
             });
         });
     }
+
+    Ok(())
 }
 
 fn name<'a>(names: &'a Option<Vec<String>>) -> &'a str {

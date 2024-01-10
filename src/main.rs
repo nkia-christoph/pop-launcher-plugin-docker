@@ -4,6 +4,7 @@ mod plugin;
 use crate::{
     docker::docker_ps,
     plugin::{
+        ContextMap,
         Plugin,
         WrappedResult,
     },
@@ -20,6 +21,7 @@ use pop_launcher_toolkit::{
         tracing::*,
     },
 };
+use std::sync::Arc;
 use tokio::time::error::Error;
 
 
@@ -50,39 +52,36 @@ impl PluginExt for Plugin {
     async fn activate(&mut self, id: Indice) {
         info!("activate request received for result: ${id}");
 
-        let result: WrappedResult;
+        let result: Arc<WrappedResult>;
         {
             let guard_results = lock!(self.results);
             match guard_results.get(&id) {
-                None => {
-                    error!("could not get result: {}", &id);
-                    return
-                }
-                Some(r) => result = r.clone()
+                None => error_return!(
+                    "could not get result: {}\n{:#?}",
+                    &id,
+                    &guard_results,
+                ),
+                Some(r) => result = Arc::clone(r),
             }
         }
 
         if result.action.is_none() {
-            info!("no action for result: {}", &id);
-            return
+            info_return!("no action for result: {}\n{:#?}", &id, &result,)
         };
 
         use plugin::Action::*;
         match result.action.unwrap() {
             Complete => {
-                info!("completing result");
-                // todo extract method so we only need to lock mutex once
+                // todo extract method so we only need to lock & read mutex once
                 self.complete(id).await;
             },
             Context => {
-                match result.context_options {
+                let result = result.clone();
+                match &result.context_options {
+                    None => info_return!("no context for result: {}", &id),
                     Some(options) => {
                         info!("returning context");
                         self.view_context_options(&id, options.clone()).await;
-                    },
-                    None => {
-                        info!("no context for result: {}", &id);
-                        return
                     },
                 }
             },
@@ -100,75 +99,63 @@ impl PluginExt for Plugin {
             &context_id,
         );
 
-        let result: WrappedResult;
-        match lock!(self.results).get(&result_id)
-        {
-            None => {
-                error!(
-                    "could not get context_option with id {} for result {}. \
-                    this should not be possible)",
-                    &context_id,
-                    &result_id,
-                );
-                return
-            },
-            Some(r) => result = r.clone(),
+        let result: Arc<WrappedResult>;
+        match lock!(self.results).get(&result_id) {
+            None => error_return!(
+                "could not get context_option with id {} for result {}. \
+                this should not be possible)",
+                &context_id,
+                &result_id,
+            ),
+            Some(r) => result = Arc::clone(r),
         }
 
         // can't do stuff without container_id
         if result.container_id.is_none() {
-            error!(
-                "cannot perform action for context: {} of result:{} \
+            error_return!(
+                "cannot perform action for context: {} of result: {} \
                 due to missing container_id. this should not be possible",
                 &context_id,
                 &result_id,
-            );
-            return
-        };
+            )
+        }
 
         let action: Option<docker::Action>;
-        match result.context_options {
-            None => {
-                error!(
-                    "no context_options for this result: {}. \
-                    this should not be possible",
-                    &result_id,
-                );
-                return
-            },
+        match &result.context_options {
+            None => error_return!(
+                "no context_options for this result: {}. \
+                this should not be possible",
+                &result_id,
+            ),
             Some(guard_context) => {
                 match lock!(guard_context).get(&context_id)
                 {
-                    None => {
-                        error!(
-                            "no context_option: {} for result: {}. \
-                            this should not be possible",
-                            &context_id,
-                            &result_id,
-                        );
-                        return
-                    },
-                    Some(context) => action = context.exec.clone()
+                    None => error_return!(
+                        "no context_option: {} for result: {}. \
+                        this should not be possible",
+                        &context_id,
+                        &result_id,
+                    ),
+                    Some(context) => action = context.exec.clone(),
                 }
             }
-        };
+        }
 
         match action {
-            None => {
-                info!(
-                    "no action set for context: {} of result: {}",
-                    &context_id,
-                    &result_id,
-                );
-                return
-            },
+            None => info_return!(
+                "no action set for context: {} of result: {}",
+                &context_id,
+                &result_id,
+            ),
             Some(action) => {
-                info!("executing action: {} for result: {}",
-                    action,
+                info!(
+                    "executing action: {} for result: {}",
+                    &action,
                     &result_id,
                 );
-                action.execute(self, &result.container_id.unwrap(), None ).await;
-            }
+                let container_id = result.container_id.clone().unwrap();
+                action.execute(self, container_id.as_str(), None ).await;
+            },
         }
     }
 
@@ -177,22 +164,19 @@ impl PluginExt for Plugin {
         info!("autocomplete request for result: {}", &id);
 
         let fill: String;
-        match lock!(self.results).get(&id)
-        {
-            None => {
-                error!(
-                    "could not get result: {} for completion. \
-                    this should not happen",
-                    &id,
-                );
-                return
-            },
+        match lock!(self.results).get(&id) {
+            None => error_return!(
+                "could not get result: {} for completion. \
+                this should not happen",
+                &id,
+            ),
             Some(result) => {
                 match &result.complete {
-                    None => {
-                        info!("no completion for result: {}", &id);
-                        return
-                    },
+                    None => info_return!(
+                        "no completion for result: {}\n{:#?}",
+                        &id,
+                        &result.complete,
+                    ),
                     Some(complete) => fill = complete.to_owned(),
                 }
             },
@@ -202,14 +186,33 @@ impl PluginExt for Plugin {
         self.respond_with(response).await;
     }
 
+    /// Handle context request from the client (on right click)
+    ///
     /// `pop-launcher` request the context for the given [`SearchResult`] id.
     /// to send the requested context use [`PluginResponse::Context`]
-    ///
-    /// [`SearchResult`]: pop_launcher::SearchResult
     async fn context(&mut self, _id: Indice) {
-        info!("context");
+        warn!("context");
 
-        todo!()
+        let options: ContextMap;
+        match lock!(self.results).get(&_id) {
+            None => error_return!(
+                "could not get result: {}. \
+                this should not happen",
+                &_id,
+            ),
+            Some(result) => {
+                match &result.context_options {
+                    None => info_return!(
+                        "no context for result: {}\n{:#?}",
+                        &_id,
+                        &result.context_options,
+                    ),
+                    Some(context) => options = Arc::clone(context),
+                }
+            },
+        }
+
+        self.view_context_options(&_id, options).await;
     }
 
     /// Whenever a new search query is issued, `pop-launcher` will send a [`Request::Interrupt`]
@@ -229,8 +232,8 @@ async fn main() -> Result<(), Error> {
     info!("docker plugin activated");
 
     let mut plugin: Plugin = Plugin::default();
-    // ToDo: impl. communication in between
-    // let _ = tokio::join!(
+    // ToDo: impl. communication/concurrency
+    // tokio::join!(
     //     docker_ps(
     //         plugin.docker.clone(),
     //         plugin.containers.clone(),
@@ -238,12 +241,11 @@ async fn main() -> Result<(), Error> {
     //     ),
     //     plugin.run(),
     // );
-    let _ = docker_ps(
+    docker_ps(
         plugin.docker.clone(),
         plugin.containers.clone(),
-        None,
-    ).await;
-    let _ = plugin.run().await;
+    ).await?;
+    plugin.run().await;
 
     Ok(())
 }
