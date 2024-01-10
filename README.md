@@ -60,3 +60,31 @@ see standard launcher log location:
 ---
 
 This plugin was created due to the mild frustration experienced with the official vscode docker extension.
+
+
+
+// ♻ U+267B
+// ↻ U+21BB
+// dc up: ⇈ U+21C8
+// dc down: ⇊ U+21CA
+// prune: ♻ U+267B
+// attach: ⎆ U+2386
+// logs: ⎙ U+2399
+
+
+
+    pub async fn view_down_notice(&mut self) {
+        info!(" - view down notice");
+
+        let result = PluginSearchResult {
+            id: 0 as Indice,
+            name: "Docker is not running".to_owned(),
+            description: "Would you like to start it?".to_owned(),
+            icon: icon_borrowed!("dialog-error"),
+            //category_icon: self.icon.to_owned(),
+            ..Default::default()
+        };
+        tokio::spawn( async move {
+            send(&mut async_stdout(),PluginResponse::Append(result)).await;
+        });
+    }

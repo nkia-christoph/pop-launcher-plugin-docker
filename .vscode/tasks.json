@@ -53,5 +53,14 @@
       "dependsOrder": "parallel",
       "group": "test",
     },
+    {
+      "label": "analyze",
+      "dependsOn": ["tools"],
+      "command": "cargo tree --duplicates -e=no-dev && cargo bloat --release --crates && cargo depgraph | dot -Tpng > target/depgraph.png",
+    },
+    {
+      "label": "tools",
+      "command": "cargo install cargo-depgraph cargo-bloat",
+    },
   ],
 }

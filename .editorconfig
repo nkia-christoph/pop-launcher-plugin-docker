@@ -12,6 +12,6 @@ indent_size = 4
 [Makefile]
 indent_style = tab
 
-[*.{json,ron,yaml}]
+[*.{json,nix,ron,yaml}]
 max_line_length = 120
 indent_size = 2

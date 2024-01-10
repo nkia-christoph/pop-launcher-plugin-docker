@@ -1,0 +1,26 @@
+(
+  input: (
+    1: """{ "Search": "dl" }""",
+    2: """{ "Search": "dps" }""",
+    3: """{ "Search": "cps" }""",
+    3: """{ "Search": "dcps" }""",
+  ),
+  output: (
+    1: (
+      name: "whoami1",
+      image: "traefik/whoami",
+    ),
+    2: (
+      name: "whoami1",
+      image: "traefik/whoami",
+    ),
+    3: (
+      name: "whoami1",
+      image: "traefik/whoami",
+    ),
+    4: (
+      name: "whoami1",
+      image: "traefik/whoami",
+    ),
+  ),
+)
